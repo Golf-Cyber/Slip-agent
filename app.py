@@ -73,7 +73,7 @@ if uploaded_files:
             try:
                 # ใช้โมเดล gemini-2.5-flash ผ่าน SDK ตัวใหม่
                 response = client.models.generate_content(
-                    model="gemini-1.5-flash",
+                    model="gemini-2.0-flash",
                     contents=[
                         types.Part.from_bytes(
                             data=file.read(), mime_type=file.type
