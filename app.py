@@ -44,8 +44,8 @@ if uploaded_files:
 
     if st.button("🚀 ประมวลผลสลิปทั้งหมดด้วย AI", type="primary"):
         results = []
-        model = genai.GenerativeModel("gemini-1.5-flash")
-
+        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+        
         system_instruction = f"""
         คุณคือ AI บัญชีสำหรับบริษัทขนส่งที่อ่านสลิปโอนเงิน
         จงอ่านรูปสลิป แล้วตอบกลับเป็น JSON Structure เท่านั้น (ห้ามมีคำเกริ่น):
