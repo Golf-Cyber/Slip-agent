@@ -2,8 +2,7 @@ import json
 import time
 import pandas as pd
 import streamlit as st
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 st.set_page_config(
     page_title="Daily Slip Processing Agent", page_icon="🧾", layout="wide"
@@ -17,7 +16,8 @@ if not api_key:
     st.error("กรุณาใส่ GEMINI_API_KEY ใน Secrets (Settings ⚙️ -> Secrets)")
     st.stop()
 
-client = genai.Client(api_key=api_key)
+# กำหนดค่า API Key สำหรับ SDK ตัวมาตรฐาน
+genai.configure(api_key=api_key)
 
 KNOWN_COLUMNS = [
     "ยข6872",
@@ -45,10 +45,11 @@ if uploaded_files:
 
     if st.button("🚀 ประมวลผลสลิปทั้งหมดด้วย AI", type="primary"):
         results = []
+        model = genai.GenerativeModel("gemini-1.5-flash")
 
         system_instruction = f"""
         คุณคือ AI บัญชีสำหรับบริษัทขนส่งที่อ่านสลิปโอนเงิน
-        จงอ่านรูปสลิป แล้วตอบกลับเป็น JSON Structure เท่านั้น (ห้ามมีคำเกริ่นหรือข้อความอื่น):
+        จงอ่านรูปสลิป แล้วตอบกลับเป็น JSON Structure เท่านั้น (ห้ามมีคำเกริ่นหรือข้อความ markdown):
         {{
             "date": "YYYY-MM-DD",
             "total_amount": 2300.0,
@@ -71,25 +72,22 @@ if uploaded_files:
 
         for idx, file in enumerate(uploaded_files):
             try:
-                # เว้นระยะห่าง 4 วินาทีระหว่างรูป เพื่อไม่ให้ติด Rate Limit ของ Free Tier
+                # หน่วงเวลา 3 วินาทีระหว่างรูปเพื่อป้องกัน Rate Limit ของโควต้าฟรี
                 if idx > 0:
-                    time.sleep(4)
+                    time.sleep(3)
 
-                response = client.models.generate_content(
-                    model="gemini-1.5-flash",
-                    contents=[
-                        types.Part.from_bytes(
-                            data=file.read(), mime_type=file.type
-                        ),
-                        "ดึงข้อมูลสลิปนี้ตามคำสั่ง",
-                    ],
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        response_mime_type="application/json",
-                    ),
+                image_bytes = file.read()
+                image_part = {"mime_type": file.type, "data": image_bytes}
+
+                response = model.generate_content([system_instruction, image_part])
+
+                # คลีนข้อความตอบกลับให้เป็น JSON เพียวๆ
+                clean_json = (
+                    response.text.replace("```json", "")
+                    .replace("```", "")
+                    .strip()
                 )
-
-                data = json.loads(response.text)
+                data = json.loads(clean_json)
 
                 for item in data.get("items", []):
                     results.append(
