@@ -1,4 +1,5 @@
 import json
+import time
 import pandas as pd
 import streamlit as st
 from google import genai
@@ -16,7 +17,6 @@ if not api_key:
     st.error("กรุณาใส่ GEMINI_API_KEY ใน Secrets (Settings ⚙️ -> Secrets)")
     st.stop()
 
-# เรียกใช้ Client จาก SDK ตัวใหม่
 client = genai.Client(api_key=api_key)
 
 KNOWN_COLUMNS = [
@@ -71,7 +71,10 @@ if uploaded_files:
 
         for idx, file in enumerate(uploaded_files):
             try:
-                # ใช้โมเดล gemini-2.5-flash ผ่าน SDK ตัวใหม่
+                # เว้นระยะห่าง 4 วินาทีระหว่างรูป เพื่อไม่ให้ติด Rate Limit ของ Free Tier
+                if idx > 0:
+                    time.sleep(4)
+
                 response = client.models.generate_content(
                     model="gemini-2.0-flash",
                     contents=[
