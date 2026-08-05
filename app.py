@@ -1,7 +1,8 @@
 import json
 import pandas as pd
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 st.set_page_config(
     page_title="Daily Slip Processing Agent", page_icon="🧾", layout="wide"
@@ -15,7 +16,8 @@ if not api_key:
     st.error("กรุณาใส่ GEMINI_API_KEY ใน Secrets (Settings ⚙️ -> Secrets)")
     st.stop()
 
-genai.configure(api_key=api_key)
+# เรียกใช้ Client จาก SDK ตัวใหม่
+client = genai.Client(api_key=api_key)
 
 KNOWN_COLUMNS = [
     "ยข6872",
@@ -30,7 +32,6 @@ KNOWN_COLUMNS = [
     "70-6325",
     "70-6324",
     "p jack",
-    "บม6501",
 ]
 
 uploaded_files = st.file_uploader(
@@ -44,11 +45,10 @@ if uploaded_files:
 
     if st.button("🚀 ประมวลผลสลิปทั้งหมดด้วย AI", type="primary"):
         results = []
-        model = genai.GenerativeModel("gemini-1.5-flash-latest")
-        
+
         system_instruction = f"""
         คุณคือ AI บัญชีสำหรับบริษัทขนส่งที่อ่านสลิปโอนเงิน
-        จงอ่านรูปสลิป แล้วตอบกลับเป็น JSON Structure เท่านั้น (ห้ามมีคำเกริ่น):
+        จงอ่านรูปสลิป แล้วตอบกลับเป็น JSON Structure เท่านั้น (ห้ามมีคำเกริ่นหรือข้อความอื่น):
         {{
             "date": "YYYY-MM-DD",
             "total_amount": 2300.0,
@@ -59,29 +59,34 @@ if uploaded_files:
             ]
         }}
 
-        เงื่อนไข:
-        1. target_column ต้องตรงกับหนึ่งในนี้เท่านั้น: {KNOWN_COLUMNS}
-        2. หาก Memo พิมพ์รหัสรถ+ยอด เช่น "9517 1000 + คนลง" ให้แตกรายการเป็น:
+        เงื่อนไขสำคัญ:
+        1. target_column ต้องเลือกให้ตรงกับรายการต่อไปนี้เท่านั้น: {KNOWN_COLUMNS}
+        2. หาก Memo พิมพ์รหัสรถและยอด เช่น "9517 1000 + คนลง" ให้แตกรายการเป็น:
            - รายการที่ 1: target_column="9517", category="ค่าน้ำมัน", amount=1000
            - รายการที่ 2: target_column="ค่าขับ/พาเลท", category="ค่าคนลงของ", amount=ส่วนที่เหลือจากยอดรวมสลิป
+        3. หาก Memo มีเฉพาะรหัสรถ เช่น "9517" หรือ "ยข6872" ให้ใส่ยอดเต็มของสลิปเข้าคอลัมน์รถนั้น
         """
 
         progress_bar = st.progress(0)
 
         for idx, file in enumerate(uploaded_files):
-            image_bytes = file.read()
-            image_part = {"mime_type": file.type, "data": image_bytes}
-
             try:
-                response = model.generate_content(
-                    [system_instruction, image_part]
+                # ใช้โมเดล gemini-2.5-flash ผ่าน SDK ตัวใหม่
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[
+                        types.Part.from_bytes(
+                            data=file.read(), mime_type=file.type
+                        ),
+                        "ดึงข้อมูลสลิปนี้ตามคำสั่ง",
+                    ],
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        response_mime_type="application/json",
+                    ),
                 )
-                clean_json = (
-                    response.text.replace("```json", "")
-                    .replace("```", "")
-                    .strip()
-                )
-                data = json.loads(clean_json)
+
+                data = json.loads(response.text)
 
                 for item in data.get("items", []):
                     results.append(
