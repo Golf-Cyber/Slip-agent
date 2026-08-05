@@ -76,7 +76,7 @@ if uploaded_files:
                     time.sleep(4)
 
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-1.5-flash",
                     contents=[
                         types.Part.from_bytes(
                             data=file.read(), mime_type=file.type
