@@ -30,7 +30,7 @@ KNOWN_COLUMNS = [
     "70-6325",
     "70-6324",
     "p jack",
-    "บม6501:,
+    "บม6501",
 ]
 
 uploaded_files = st.file_uploader(
